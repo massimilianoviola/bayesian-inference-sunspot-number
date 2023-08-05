@@ -43,7 +43,7 @@ for iter in range(n):
     # normalize the FFT output
     amplitudes = 2 / n_samples * np.abs(fourier)
     # get the frequency components of the spectrum
-    timestep = (t.max() - t.min()) / n_samples  # sample spacing
+    timestep = (t.max() - t.min()) / (n_samples - 1)  # sample spacing
     frequencies = fft.rfftfreq(n_samples, d=timestep)
 
     # index of peak amplitude
