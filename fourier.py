@@ -31,7 +31,7 @@ n = 15
 plot_steps = False  # show evolution at each step
 
 estimates_A = np.zeros(n)  # magnitudes
-estimates_F = np.zeros(n)  # frequencies
+estimates_T = np.zeros(n)  # periods
 estimates_P = np.zeros(n)  # phases
 print("-"*50)
 
@@ -50,12 +50,13 @@ for iter in range(n):
     index = np.argmax(amplitudes)
     # strongest frequency component
     frequency = frequencies[index]
-    print(f"Frequency: {frequency}")
+    period = 1 / frequency
+    print(f"Period: {period}")
     # normalized amplitude
     magnitude = 2 / n_samples * np.abs(fourier[index])
     print(f"Magnitude: {magnitude}")
     # phase, with time shift 
-    phase = (np.angle(fourier[index]) - 2 * np.pi * frequency * t.min()) % (2 * np.pi) 
+    phase = (np.angle(fourier[index]) - 2 * np.pi / period * t.min()) % (2 * np.pi) 
     print(f"Phase: {phase}")
     # or represent as cosine and sine, without phase
     B1 = magnitude * np.cos(phase)  # cosine multiplier
@@ -63,7 +64,7 @@ for iter in range(n):
     print(f"B1: {B1}, B2: {B2}")
 
     estimates_A[iter] = magnitude
-    estimates_F[iter] = frequency
+    estimates_T[iter] = period
     estimates_P[iter] = phase
 
     if plot_steps:
@@ -79,16 +80,16 @@ for iter in range(n):
 
         plt.subplot(3, 1, 2)
         plt.plot(t, current_y, label="Current signal")
-        plt.plot(t, magnitude * np.cos(2 * np.pi * frequency * t + phase), label="Estimate")
-        #plt.plot(t, B1 * np.cos(2 * np.pi * frequency * t) + B2 * np.sin(2 * np.pi * frequency * t), c="orange")
+        plt.plot(t, magnitude * np.cos(2 * np.pi / period * t + phase), label="Estimate")
+        #plt.plot(t, B1 * np.cos(2 * np.pi / period * t) + B2 * np.sin(2 * np.pi / period * t), c="orange")
         plt.xlabel("Time")
         plt.ylabel("Normalized count")
         plt.title("Estimated component")
         plt.legend()
 
         plt.subplot(3, 1, 3)
-        plt.plot(t, current_y - magnitude * np.cos(2 * np.pi * frequency * t + phase))
-        #plt.plot(t, current_y - B1 * np.cos(2 * np.pi * frequency * t) - B2 * np.sin(2 * np.pi * frequency * t), c="orange")
+        plt.plot(t, current_y - magnitude * np.cos(2 * np.pi / period * t + phase))
+        #plt.plot(t, current_y - B1 * np.cos(2 * np.pi / period * t) - B2 * np.sin(2 * np.pi / period * t), c="orange")
         plt.xlabel("Time")
         plt.ylabel("Normalized count")
         plt.title("Residuals")
@@ -98,7 +99,7 @@ for iter in range(n):
     
     print("-"*50)
     # remove estimated component from the signal
-    current_y = current_y - magnitude * np.cos(2 * np.pi * frequency * t + phase)
+    current_y = current_y - magnitude * np.cos(2 * np.pi / period * t + phase)
 
 # assume gaussian noise
 sigma = np.std(current_y)
@@ -121,8 +122,8 @@ plt.tight_layout()
 
 # plot reconstructed signal as sum of n cosines
 signal = np.zeros(len(t))
-for magnitude, frequency, phase in zip(estimates_A, estimates_F, estimates_P):
-    signal += magnitude * np.cos(2 * np.pi * frequency * t + phase)
+for magnitude, period, phase in zip(estimates_A, estimates_T, estimates_P):
+    signal += magnitude * np.cos(2 * np.pi / period * t + phase)
 plt.figure(figsize=(12, 4))
 plt.plot(t, y - y.mean(), label="Original")
 plt.plot(t, signal, label="Reconstructed")
@@ -133,6 +134,6 @@ plt.legend()
 plt.tight_layout()
 
 # save to disk the results of fourier analysis under their corresponding name
-np.savez("fourier.npz", estimates_A=estimates_A, estimates_F=estimates_F, estimates_P=estimates_P, sigma=[sigma])
+np.savez("fourier.npz", estimates_A=estimates_A, estimates_T=estimates_T, estimates_P=estimates_P, sigma=[sigma])
 
 plt.show()

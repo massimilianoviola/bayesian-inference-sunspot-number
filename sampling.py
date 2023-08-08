@@ -19,7 +19,7 @@ y = y - y.mean()  # normalize
 # load data from fourier decomposition with n cosines
 z = np.load("fourier.npz")
 # get components by their name. sol has shape=(3n+1,)
-sol = np.concatenate((z["estimates_A"], z["estimates_F"], z["estimates_P"], z["sigma"]))
+sol = np.concatenate((z["estimates_A"], z["estimates_T"], z["estimates_P"], z["sigma"]))
 n = len(sol) // 3
 
 # initialize the walkers in a tiny gaussian ball around the fourier decomposition
@@ -36,8 +36,8 @@ def log_prior(theta):
 
 def log_likelihood(theta, y, t, n):
     n_samples = len(y)
-    A, w, phi, sigma = theta[:n], theta[n:2*n], theta[2*n:3*n], theta[-1]
-    return -n_samples/2 * np.log(2 * np.pi * sigma**2) - 1/(2 * sigma**2) * ((y - (A * np.cos(np.outer(t, 2 * np.pi * w) + phi)).sum(axis=1))**2).sum()
+    A, T, phi, sigma = theta[:n], theta[n:2*n], theta[2*n:3*n], theta[-1]
+    return -n_samples/2 * np.log(2 * np.pi * sigma**2) - 1/(2 * sigma**2) * ((y - (A * np.cos(np.outer(t, 2 * np.pi / T) + phi)).sum(axis=1))**2).sum()
 
 
 def log_probability(theta, y, t, n):
@@ -64,7 +64,7 @@ tau = sampler.get_autocorr_time(quiet=True)
 fig, axes = plt.subplots(4, figsize=(10, 8), sharex=True)
 samples = sampler.get_chain()
 print(samples.shape)
-labels = ["w1", "w2", "w3", "w4"]
+labels = ["T1", "T2", "T3", "T4"]
 for i in range(4):
     ax = axes[i]
     ax.plot(samples[:, :, 15+i], "k", alpha=0.3)
@@ -79,13 +79,13 @@ print(samples.shape)
 for i in range(n, 2*n):
     plt.figure(figsize=(12, 4))
     plt.hist(samples[:, i], 100, color="k", histtype="step")
-    plt.xlabel(fr"$\omega_{{{i-n+1}}}$")
-    plt.ylabel(fr"$p(\omega_{{{i-n+1}}})$")
+    plt.xlabel(fr"$T_{{{i-n+1}}}$")
+    plt.ylabel(fr"$p(T_{{{i-n+1}}})$")
     plt.gca().set_yticks([])
     plt.tight_layout()
 
     perc = np.percentile(samples[:, i], [16, 50, 84])
-    print(f"omega_{i-n+1} interval: {perc[0], perc[2]}")
+    print(f"T_{i-n+1} interval: {perc[0], perc[2]}")
 
 print(
     "Mean acceptance fraction: {0:.3f}".format(
