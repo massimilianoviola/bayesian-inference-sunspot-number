@@ -33,10 +33,12 @@ plot_steps = False  # show evolution at each step
 estimates_A = np.zeros(n)  # magnitudes
 estimates_T = np.zeros(n)  # periods
 estimates_P = np.zeros(n)  # phases
+
+print(f"Using {n} components...\n")
 print("-"*50)
 
 for iter in range(n):
-    print(f"Iteration {iter+1}")
+    print(f"> Iteration {iter+1}")
 
     # apply the FFT on the signal
     fourier = fft.rfft(current_y)
@@ -59,9 +61,9 @@ for iter in range(n):
     phase = (np.angle(fourier[index]) - 2 * np.pi / period * t.min()) % (2 * np.pi) 
     print(f"Phase: {phase}")
     # or represent as cosine and sine, without phase
-    B1 = magnitude * np.cos(phase)  # cosine multiplier
-    B2 = - magnitude * np.sin(phase)  # sine multiplier
-    print(f"B1: {B1}, B2: {B2}")
+    #B1 = magnitude * np.cos(phase)  # cosine multiplier
+    #B2 = - magnitude * np.sin(phase)  # sine multiplier
+    #print(f"B1: {B1}, B2: {B2}")
 
     estimates_A[iter] = magnitude
     estimates_T[iter] = period
@@ -135,5 +137,7 @@ plt.tight_layout()
 
 # save to disk the results of fourier analysis under their corresponding name
 np.savez("fourier.npz", estimates_A=estimates_A, estimates_T=estimates_T, estimates_P=estimates_P, sigma=[sigma])
+
+print(f"\nTotal number of parameters: {len(estimates_A) + len(estimates_T) + len(estimates_P) + 1}")
 
 plt.show()
