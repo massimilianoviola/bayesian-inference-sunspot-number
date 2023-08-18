@@ -58,7 +58,9 @@ for iter in range(n):
     magnitude = 2 / n_samples * np.abs(fourier[index])
     print(f"Magnitude: {magnitude}")
     # phase, with time shift 
-    phase = (np.angle(fourier[index]) - 2 * np.pi / period * t.min()) % (2 * np.pi) 
+    phase = (np.angle(fourier[index]) - 2 * np.pi / period * t.min()) % (2 * np.pi)
+    if phase > np.pi:  # move phases in [-pi, pi] from [0, 2pi]
+        phase = phase - 2 * np.pi
     print(f"Phase: {phase}")
     # or represent as cosine and sine, without phase
     #B1 = magnitude * np.cos(phase)  # cosine multiplier
@@ -101,7 +103,11 @@ for iter in range(n):
     
     print("-"*50)
     # remove estimated component from the signal
-    current_y = current_y - magnitude * np.cos(2 * np.pi / period * t + phase)
+    # set power to 0 and do inverse fft
+    fourier[index] = 0
+    current_y = fft.irfft(fourier)
+    # or remove the cosine wave from every observation
+    #current_y = current_y - magnitude * np.cos(2 * np.pi / period * t + phase)
 
 # assume gaussian noise
 sigma = np.std(current_y)
