@@ -59,8 +59,6 @@ sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(y, t, n),
 
 state = sampler.run_mcmc(pos, 25000, progress=True)
 
-tau = sampler.get_autocorr_time(quiet=True)
-
 samples = sampler.get_chain()
 print(samples.shape)
 
@@ -121,17 +119,63 @@ plt.xlabel("Step number")
 plt.title("$\sigma$ chain")
 plt.tight_layout()
 
-samples = sampler.get_chain(flat=True)
-print(samples.shape)
+logprob = sampler.get_log_prob()  # log posterior chains
+# plot posterior values of each walker as a function of the number of steps
+plt.figure(figsize=(12, 4))
+plt.plot(logprob, "k", alpha=0.3)
+plt.xlim(0, len(logprob))
+plt.xlabel("Step number")
+plt.ylabel("Log posterior")
+plt.title("Log posterior chains")
+plt.tight_layout()
 
+# estimate of the integrated autocorrelation time
+tau = sampler.get_autocorr_time(quiet=True)
+print(f"Mean autocorrelation time: {np.mean(tau):.3f} steps")
+tau_max = int(tau.max())
+
+flat_samples = sampler.get_chain(flat=True)
+print(flat_samples.shape)
+
+flat_logprob = sampler.get_log_prob(flat=True)
+theta_max = flat_samples[np.argmax(flat_logprob)]  # MAP estimate
+
+# project the sampling results into the observed data space
+plt.figure(figsize=(12, 4))
+inds = np.random.randint(len(flat_samples), size=500)
+for ind in inds:
+    sample = flat_samples[ind]
+    A, T, phi, sigma = sample[:n], sample[n:2*n], sample[2*n:3*n], sample[-1]
+    signal = np.zeros(len(t))
+    for magnitude, period, phase in zip(A, T, phi):
+        signal += magnitude * np.cos(2 * np.pi / period * t + phase)
+    plt.plot(t, signal, "C1", alpha=0.1)
+
+# add the initial estimate obtained from fourier
+A, T, phi, sigma = sol[:n], sol[n:2*n], sol[2*n:3*n], sol[-1]
+signal = np.zeros(len(t))
+for magnitude, period, phase in zip(A, T, phi):
+    signal += magnitude * np.cos(2 * np.pi / period * t + phase)
+plt.plot(t, signal, "C9", label="Initial estimate", lw=2)
+
+# add the estimate with maximum value of posterior (MAP estimate)
+A, T, phi, sigma = theta_max[:n], theta_max[n:2*n], theta_max[2*n:3*n], theta_max[-1]
+signal = np.zeros(len(t))
+for magnitude, period, phase in zip(A, T, phi):
+    signal += magnitude * np.cos(2 * np.pi / period * t + phase)
+plt.plot(t, signal, "C8", label="MAP estimate", lw=2)
+
+# add observed data in the background
+plt.plot(t, y, "k", label="Data samples", alpha=0.3)
+plt.legend(fontsize=14)
+plt.xlabel("Time")
+plt.ylabel("Normalized count")
+plt.title("Projection of the sampling results into the observed data space")
+plt.tight_layout()
+
+# print confidence intervals for the periods
+# use 16th, 50th, and 84th percentiles of the samples in the marginalized distributions
 for i in range(n, 2*n):
-    plt.figure(figsize=(12, 4))
-    plt.hist(samples[:, i], 100, color="k", histtype="step")
-    plt.xlabel(fr"$T_{{{i-n+1}}}$")
-    plt.ylabel(fr"$p(T_{{{i-n+1}}})$")
-    plt.gca().set_yticks([])
-    plt.tight_layout()
-
     perc = np.percentile(samples[:, i], [16, 50, 84])
     print(f"T_{i-n+1} interval: {perc[0], perc[2]}")
 
