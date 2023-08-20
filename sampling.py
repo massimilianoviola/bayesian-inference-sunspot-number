@@ -160,10 +160,10 @@ plt.plot(t, signal, "C9", label="Initial estimate", lw=2)
 
 # add the estimate with maximum value of posterior (MAP estimate)
 A, T, phi, sigma = theta_max[:n], theta_max[n:2*n], theta_max[2*n:3*n], theta_max[-1]
-signal = np.zeros(len(t))
+map_signal = np.zeros(len(t))
 for magnitude, period, phase in zip(A, T, phi):
-    signal += magnitude * np.cos(2 * np.pi / period * t + phase)
-plt.plot(t, signal, "C8", label="MAP estimate", lw=2)
+    map_signal += magnitude * np.cos(2 * np.pi / period * t + phase)
+plt.plot(t, map_signal, "C8", label="MAP estimate", lw=2)
 
 # add observed data in the background
 plt.plot(t, y, "k", label="Data samples", alpha=0.3)
@@ -173,11 +173,45 @@ plt.ylabel("Normalized count")
 plt.title("Projection of the sampling results into the observed data space")
 plt.tight_layout()
 
+# plot 2 sigma posterior spread into the observed data space
+models = []
+thetas = flat_samples[inds]
+for theta in thetas:
+    A, T, phi, sigma = theta[:n], theta[n:2*n], theta[2*n:3*n], theta[-1]
+    signal = np.zeros(len(t))
+    for magnitude, period, phase in zip(A, T, phi):
+        signal += magnitude * np.cos(2 * np.pi / period * t + phase)
+    models.append(signal)
+spread = np.std(models, axis=0)
+med_model = np.median(models, axis=0)
+
+plt.figure(figsize=(12, 4))
+plt.plot(t, y, "k", label="Data samples", alpha=0.3)
+plt.plot(t, map_signal, label="MAP estimate", c="C1")
+plt.fill_between(t, med_model - 2*spread, med_model + 2*spread, color="C7", alpha=0.5, label=r"$2\sigma$ posterior spread")
+plt.legend(fontsize=14)
+plt.xlabel("Time")
+plt.ylabel("Normalized count")
+plt.title(r"$2\sigma$ posterior spread into the observed data space")
+plt.tight_layout()
+
 # print confidence intervals for the periods
 # use 16th, 50th, and 84th percentiles of the samples in the marginalized distributions
+jupiter = 11.862  # target period
 for i in range(n, 2*n):
     perc = np.percentile(samples[:, i], [16, 50, 84])
     print(f"T_{i-n+1} interval: {perc[0], perc[2]}")
+    
+    if flat_samples[:, i].min() < jupiter < flat_samples[:, i].max():  # compatible T
+        plt.figure(figsize=(12, 4))
+        plt.hist(flat_samples[:, i], 100, color="k", histtype="step")
+        plt.axvline(jupiter, c="C1", label="Jupiter orbital period")
+        plt.xlabel(fr"$T_{{{i-n+1}}}$")
+        plt.ylabel(fr"$p(T_{{{i-n+1}}})$")
+        plt.title(fr"Distribution of $T_{{{i-n+1}}}$ samples")
+        plt.gca().set_yticks([])
+        plt.legend(fontsize=14)
+        plt.tight_layout()
 
 print(
     "Mean acceptance fraction: {0:.3f}".format(
