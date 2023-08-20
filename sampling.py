@@ -61,17 +61,65 @@ state = sampler.run_mcmc(pos, 25000, progress=True)
 
 tau = sampler.get_autocorr_time(quiet=True)
 
-fig, axes = plt.subplots(4, figsize=(10, 8), sharex=True)
 samples = sampler.get_chain()
 print(samples.shape)
-labels = ["T1", "T2", "T3", "T4"]
-for i in range(4):
-    ax = axes[i]
-    ax.plot(samples[:, :, 15+i], "k", alpha=0.3)
-    ax.set_xlim(0, len(samples))
-    ax.set_ylabel(labels[i])
-    ax.yaxis.set_label_coords(-0.1, 0.5)
-axes[-1].set_xlabel("step number")
+
+M = 5  # maximum number of subplots per figure
+num_figures = (n - 1) // M + 1
+
+# plot positions of each walker as a function of the number of steps for A
+for fig_num in range(num_figures):
+    start_index = fig_num * M
+    end_index = min((fig_num + 1) * M, n)
+    fig, axes = plt.subplots(end_index - start_index, figsize=(12, 1.5 * (end_index - start_index)), sharex=True)
+    labels = [f"$A_{{{i+1}}}$" for i in range(start_index, end_index)]
+    for i in range(len(labels)):
+        ax = axes[i]
+        ax.plot(samples[:, :, i + start_index], "k", alpha=0.3)
+        ax.set_xlim(0, len(samples))
+        ax.set_ylabel(labels[i])
+    axes[-1].set_xlabel("Step number")
+    axes[0].set_title("$A$ chains")
+    plt.tight_layout()
+
+# plot positions of each walker as a function of the number of steps for T
+for fig_num in range(num_figures):
+    start_index = fig_num * M
+    end_index = min((fig_num + 1) * M, n)
+    fig, axes = plt.subplots(end_index - start_index, figsize=(12, 1.5 * (end_index - start_index)), sharex=True)
+    labels = [f"$T_{{{i+1}}}$" for i in range(start_index, end_index)]
+    for i in range(len(labels)):
+        ax = axes[i]
+        ax.plot(samples[:, :, i + n + start_index], "k", alpha=0.3)
+        ax.set_xlim(0, len(samples))
+        ax.set_ylabel(labels[i])
+    axes[-1].set_xlabel("Step number")
+    axes[0].set_title("$T$ chains")
+    plt.tight_layout()
+
+# plot positions of each walker as a function of the number of steps for phi
+for fig_num in range(num_figures):
+    start_index = fig_num * M
+    end_index = min((fig_num + 1) * M, n)
+    fig, axes = plt.subplots(end_index - start_index, figsize=(12, 1.5 * (end_index - start_index)), sharex=True)
+    labels = [f"$\phi_{{{i+1}}}$" for i in range(start_index, end_index)]
+    for i in range(len(labels)):
+        ax = axes[i]
+        ax.plot(samples[:, :, i + 2*n + start_index], "k", alpha=0.3)
+        ax.set_xlim(0, len(samples))
+        ax.set_ylabel(labels[i])
+    axes[-1].set_xlabel("Step number")
+    axes[0].set_title("$\phi$ chains")
+    plt.tight_layout()
+
+# plot positions of each walker as a function of the number of steps for sigma
+plt.figure(figsize=(12, 2))
+plt.plot(samples[:, :, -1], "k", alpha=0.3)
+plt.xlim(0, len(samples))
+plt.ylabel("$\sigma$")
+plt.xlabel("Step number")
+plt.title("$\sigma$ chain")
+plt.tight_layout()
 
 samples = sampler.get_chain(flat=True)
 print(samples.shape)
