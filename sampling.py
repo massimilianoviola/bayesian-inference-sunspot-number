@@ -49,18 +49,11 @@ def log_probability(theta, y, t, n):
 
 # initialize the sampler
 sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(y, t, n), moves=emcee.moves.StretchMove(a=2.0))
-
-# run a few “burn-in” steps to let the walkers explore the parameter space and get settled into the maximum of the density
-#print("Running burn-in steps...")
-#state = sampler.run_mcmc(pos, 100, progress=True)  # save the final position
-#sampler.reset()
-# run true production run from the new initial position
-#sampler.run_mcmc(state, 500, progress=True)
-
 state = sampler.run_mcmc(pos, 25000, progress=True)
 
 samples = sampler.get_chain()
-print(samples.shape)
+print(f"Samples shape: {samples.shape}")
+print("-"*50, "\n")
 
 ##################################################
 
@@ -139,12 +132,15 @@ plt.tight_layout()
 # estimate of the integrated autocorrelation time
 tau = sampler.get_autocorr_time(quiet=True)
 print(f"Mean autocorrelation time: {np.mean(tau):.3f} steps")
-tau_max = int(tau.max())
+burnin = int(5 * np.max(tau))  # throw away a few times max autocorrelation as burn-in
+thin = int(0.5 * np.min(tau))  # thin by half the min autocorrelation time
+print(f"Burn-in: {burnin} steps")
+print(f"Thin by: {thin} steps")
 
-flat_samples = sampler.get_chain(flat=True)
-print(flat_samples.shape)
+flat_samples = sampler.get_chain(flat=True, discard=burnin, thin=thin)
+print(f"Flat samples shape (after burn-in and thin): {flat_samples.shape}")
 
-flat_logprob = sampler.get_log_prob(flat=True)
+flat_logprob = sampler.get_log_prob(flat=True, discard=burnin, thin=thin)
 theta_max = flat_samples[np.argmax(flat_logprob)]  # MAP estimate
 
 ##################################################
@@ -220,7 +216,7 @@ for i in range(n, 2*n):
         plt.hist(flat_samples[:, i], 100, color="k", histtype="step")
         plt.axvline(jupiter, c="C1", label="Jupiter")
         plt.axvline(perc[0], c="C9", label="95% CI")
-        plt.axvline(perc[-1], c="C9" )
+        plt.axvline(perc[-1], c="C9")
         plt.axvline(perc[1], c="C7", label="68% CI")
         plt.axvline(perc[-2], c="C7")
         plt.xlabel(fr"$T_{{{i-n+1}}}$")
