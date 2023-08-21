@@ -62,6 +62,8 @@ state = sampler.run_mcmc(pos, 25000, progress=True)
 samples = sampler.get_chain()
 print(samples.shape)
 
+##################################################
+
 M = 5  # maximum number of subplots per figure
 num_figures = (n - 1) // M + 1
 
@@ -119,6 +121,9 @@ plt.xlabel("Step number")
 plt.title("$\sigma$ chain")
 plt.tight_layout()
 
+##################################################
+
+del samples
 logprob = sampler.get_log_prob()  # log posterior chains
 # plot posterior values of each walker as a function of the number of steps
 plt.figure(figsize=(12, 4))
@@ -128,6 +133,8 @@ plt.xlabel("Step number")
 plt.ylabel("Log posterior")
 plt.title("Log posterior chains")
 plt.tight_layout()
+
+##################################################
 
 # estimate of the integrated autocorrelation time
 tau = sampler.get_autocorr_time(quiet=True)
@@ -139,6 +146,8 @@ print(flat_samples.shape)
 
 flat_logprob = sampler.get_log_prob(flat=True)
 theta_max = flat_samples[np.argmax(flat_logprob)]  # MAP estimate
+
+##################################################
 
 # project the sampling results into the observed data space
 plt.figure(figsize=(12, 4))
@@ -166,12 +175,14 @@ for magnitude, period, phase in zip(A, T, phi):
 plt.plot(t, map_signal, "C8", label="MAP estimate", lw=2)
 
 # add observed data in the background
-plt.plot(t, y, "k", label="Data samples", alpha=0.3)
+plt.plot(t, y, "k", label="Data points", alpha=0.3)
 plt.legend(fontsize=14)
 plt.xlabel("Time")
 plt.ylabel("Normalized count")
 plt.title("Projection of the sampling results into the observed data space")
 plt.tight_layout()
+
+##################################################
 
 # plot 2 sigma posterior spread into the observed data space
 models = []
@@ -186,7 +197,7 @@ spread = np.std(models, axis=0)
 med_model = np.median(models, axis=0)
 
 plt.figure(figsize=(12, 4))
-plt.plot(t, y, "k", label="Data samples", alpha=0.3)
+plt.plot(t, y, "k", label="Data points", alpha=0.3)
 plt.plot(t, map_signal, label="MAP estimate", c="C1")
 plt.fill_between(t, med_model - 2*spread, med_model + 2*spread, color="C7", alpha=0.5, label=r"$2\sigma$ posterior spread")
 plt.legend(fontsize=14)
@@ -195,12 +206,14 @@ plt.ylabel("Normalized count")
 plt.title(r"$2\sigma$ posterior spread into the observed data space")
 plt.tight_layout()
 
+##################################################
+
 # print confidence intervals for the periods
 # use 16th, 50th, and 84th percentiles of the samples in the marginalized distributions
 jupiter = 11.862  # target period
 for i in range(n, 2*n):
-    perc = np.percentile(samples[:, i], [16, 50, 84])
-    print(f"T_{i-n+1} interval: {perc[0], perc[2]}")
+    perc = np.percentile(flat_samples[:, i], [16, 50, 84])
+    print(f"T_{i-n+1} 68% confidence interval: ({perc[0]:.3f}, {perc[2]:.3f})")
     
     if flat_samples[:, i].min() < jupiter < flat_samples[:, i].max():  # compatible T
         plt.figure(figsize=(12, 4))
