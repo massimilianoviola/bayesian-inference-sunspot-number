@@ -209,16 +209,20 @@ plt.tight_layout()
 ##################################################
 
 # print confidence intervals for the periods
-# use 16th, 50th, and 84th percentiles of the samples in the marginalized distributions
+# use percentiles of the samples in the marginalized distributions
 jupiter = 11.862  # target period
 for i in range(n, 2*n):
-    perc = np.percentile(flat_samples[:, i], [16, 50, 84])
-    print(f"T_{i-n+1} 68% confidence interval: ({perc[0]:.3f}, {perc[2]:.3f})")
+    perc = np.percentile(flat_samples[:, i], [2.5, 16, 84, 97.5])
+    print(f"T_{i-n+1} 95% confidence interval: ({perc[0]:.3f}, {perc[-1]:.3f})")
     
     if flat_samples[:, i].min() < jupiter < flat_samples[:, i].max():  # compatible T
-        plt.figure(figsize=(12, 4))
+        plt.figure(figsize=(6, 4))
         plt.hist(flat_samples[:, i], 100, color="k", histtype="step")
-        plt.axvline(jupiter, c="C1", label="Jupiter orbital period")
+        plt.axvline(jupiter, c="C1", label="Jupiter")
+        plt.axvline(perc[0], c="C9", label="95% CI")
+        plt.axvline(perc[-1], c="C9" )
+        plt.axvline(perc[1], c="C7", label="68% CI")
+        plt.axvline(perc[-2], c="C7")
         plt.xlabel(fr"$T_{{{i-n+1}}}$")
         plt.ylabel(fr"$p(T_{{{i-n+1}}})$")
         plt.title(fr"Distribution of $T_{{{i-n+1}}}$ samples")
