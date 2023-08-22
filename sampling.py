@@ -21,10 +21,11 @@ z = np.load("fourier.npz")
 # get components by their name. sol has shape=(3n+1,)
 sol = np.concatenate((z["estimates_A"], z["estimates_T"], z["estimates_P"], z["sigma"]))
 n = len(sol) // 3
+n_samples = len(y)
 
 # initialize the walkers in a tiny gaussian ball around the fourier decomposition
 nwalkers = 128
-pos = sol + 1e-3 * np.random.randn(nwalkers, len(sol)) * sol  # use variance proportional to magnitude
+pos = sol + 1e-5 * np.random.randn(nwalkers, len(sol)) * sol  # use variance proportional to magnitude
 nwalkers, ndim = pos.shape
 
 
@@ -34,26 +35,26 @@ def log_prior(theta):
     return -np.log(sigma) if sigma > 0 else -np.inf
 
 
-def log_likelihood(theta, y, t, n):
-    n_samples = len(y)
+def log_likelihood(theta):
     A, T, phi, sigma = theta[:n], theta[n:2*n], theta[2*n:3*n], theta[-1]
     return -n_samples/2 * np.log(2 * np.pi * sigma**2) - 1/(2 * sigma**2) * ((y - (A * np.cos(np.outer(t, 2 * np.pi / T) + phi)).sum(axis=1))**2).sum()
 
 
-def log_probability(theta, y, t, n):
+def log_probability(theta):
     lp = log_prior(theta)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + log_likelihood(theta, y, t, n)
+    return lp + log_likelihood(theta)
 
 
 # initialize the sampler
-sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(y, t, n), moves=emcee.moves.StretchMove(a=2.0))
+sampler = emcee.EnsembleSampler(
+    nwalkers, ndim, log_probability, moves=emcee.moves.DEMove()
+)
 state = sampler.run_mcmc(pos, 25000, progress=True)
 
 samples = sampler.get_chain()
 print(f"Samples shape: {samples.shape}")
-print("-"*50, "\n")
 
 ##################################################
 
@@ -139,6 +140,7 @@ print(f"Thin by: {thin} steps")
 
 flat_samples = sampler.get_chain(flat=True, discard=burnin, thin=thin)
 print(f"Flat samples shape (after burn-in and thin): {flat_samples.shape}")
+print("-"*50, "\n")
 
 flat_logprob = sampler.get_log_prob(flat=True, discard=burnin, thin=thin)
 theta_max = flat_samples[np.argmax(flat_logprob)]  # MAP estimate
@@ -212,7 +214,7 @@ for i in range(n, 2*n):
     print(f"T_{i-n+1} 95% confidence interval: ({perc[0]:.3f}, {perc[-1]:.3f})")
     
     if flat_samples[:, i].min() < jupiter < flat_samples[:, i].max():  # compatible T
-        plt.figure(figsize=(6, 4))
+        plt.figure(figsize=(8, 4))
         plt.hist(flat_samples[:, i], 100, color="k", histtype="step")
         plt.axvline(jupiter, c="C1", label="Jupiter")
         plt.axvline(perc[0], c="C9", label="95% CI")
