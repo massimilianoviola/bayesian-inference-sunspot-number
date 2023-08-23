@@ -8,7 +8,7 @@ plt.rcParams["savefig.dpi"] = 400
 plt.style.use("bmh")
 
 # read monthly data and convert to numpy array
-data = pd.read_csv("Sunspots_observations.csv", skiprows=6)
+data = pd.read_csv("data/Sunspots_observations.csv", skiprows=6)
 data = data.loc[data["Year CE.1"].notnull(), ["Year CE.1", "SNm"]].to_numpy()
 
 # t: time in years, y: monthly mean total sunspot number
@@ -142,7 +142,7 @@ plt.legend()
 plt.tight_layout()
 
 # save to disk the results of fourier analysis under their corresponding name
-np.savez("fourier.npz", estimates_A=estimates_A, estimates_T=estimates_T, estimates_P=estimates_P, sigma=[sigma])
+np.savez("data/fourier.npz", estimates_A=estimates_A, estimates_T=estimates_T, estimates_P=estimates_P, sigma=[sigma])
 
 print(f"\nTotal number of parameters: {len(estimates_A) + len(estimates_T) + len(estimates_P) + 1}")
 

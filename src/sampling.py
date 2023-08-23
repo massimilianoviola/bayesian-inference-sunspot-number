@@ -9,7 +9,7 @@ plt.rcParams["savefig.dpi"] = 400
 plt.style.use("bmh")
 
 # read data and convert to numpy array
-data = pd.read_csv("Sunspots_observations.csv", skiprows=6)
+data = pd.read_csv("data/Sunspots_observations.csv", skiprows=6)
 data = data.loc[data["Year CE.1"].notnull(), ["Year CE.1", "SNm"]].to_numpy()
 
 # t: time in years, y: monthly mean total sunspot number
@@ -18,7 +18,7 @@ y = data[:, 1]
 y = y - y.mean()  # normalize
 
 # load data from fourier decomposition with n cosines
-z = np.load("fourier.npz")
+z = np.load("data/fourier.npz")
 # get components by their name. sol has shape=(3n+1,)
 sol = np.concatenate((z["estimates_A"], z["estimates_T"], z["estimates_P"], z["sigma"]))
 n = len(sol) // 3
@@ -37,7 +37,7 @@ phi_var = np.pi  # the variance of the gaussian, higher value means less regular
 def log_prior(theta):
     A, T, phi, sigma = theta[:n], theta[n:2*n], theta[2*n:3*n], theta[-1]
     if sigma > 0 and all(A > 0) and all(T > 0):
-        return -np.log(sigma) -  1/(2 * phi_var**2) * np.sum(phi**2)
+        return -np.log(sigma) - 1/(2 * phi_var**2) * np.sum(phi**2)
     else:
         return -np.inf
 
@@ -152,38 +152,39 @@ if __name__ == "__main__":
     print(f"Thin by: {thin} steps")
 
     flat_samples = sampler.get_chain(flat=True, discard=burnin, thin=thin)
-    print(f"Flat samples shape (after burn-in and thin): {flat_samples.shape}")
-    print("-"*50, "\n")
+    print(f"Flat samples shape (after burn-in and thin): {flat_samples.shape}\n")
 
     flat_logprob = sampler.get_log_prob(flat=True, discard=burnin, thin=thin)
     theta_max = flat_samples[np.argmax(flat_logprob)]  # MAP estimate
+    print(f"Log likelihood improved from {log_likelihood(sol):.3f} to {log_likelihood(theta_max):.3f}\n")
+    print("-"*50)
 
     ##################################################
 
     # project the sampling results into the observed data space
-    plt.figure(figsize=(12, 4))
-    inds = np.random.randint(len(flat_samples), size=500)
+    plt.figure(figsize=(12, 5))
+    inds = np.random.randint(len(flat_samples), size=200)
     for ind in inds:
         sample = flat_samples[ind]
         A, T, phi, sigma = sample[:n], sample[n:2*n], sample[2*n:3*n], sample[-1]
         signal = np.zeros(len(t))
         for magnitude, period, phase in zip(A, T, phi):
             signal += magnitude * np.cos(2 * np.pi / period * t + phase)
-        plt.plot(t, signal, "C1", alpha=0.1)
+        plt.plot(t, signal, "C7", alpha=0.1, label="Samples") if ind == inds[0] else plt.plot(t, signal, "C7", alpha=0.1)
 
     # add the initial estimate obtained from fourier
     A, T, phi, sigma = sol[:n], sol[n:2*n], sol[2*n:3*n], sol[-1]
     signal = np.zeros(len(t))
     for magnitude, period, phase in zip(A, T, phi):
         signal += magnitude * np.cos(2 * np.pi / period * t + phase)
-    plt.plot(t, signal, "C9", label="Initial estimate", lw=2)
+    plt.plot(t, signal, "C8", label="Initial estimate")
 
     # add the estimate with maximum value of posterior (MAP estimate)
     A, T, phi, sigma = theta_max[:n], theta_max[n:2*n], theta_max[2*n:3*n], theta_max[-1]
     map_signal = np.zeros(len(t))
     for magnitude, period, phase in zip(A, T, phi):
         map_signal += magnitude * np.cos(2 * np.pi / period * t + phase)
-    plt.plot(t, map_signal, "C8", label="MAP estimate", lw=2)
+    plt.plot(t, map_signal, "C1", label="MAP estimate")
 
     # add observed data in the background
     plt.plot(t, y, "k", label="Data points", alpha=0.3)
@@ -207,10 +208,10 @@ if __name__ == "__main__":
     spread = np.std(models, axis=0)
     med_model = np.median(models, axis=0)
 
-    plt.figure(figsize=(12, 4))
-    plt.plot(t, y, "k", label="Data points", alpha=0.3)
+    plt.figure(figsize=(12, 5))
     plt.plot(t, map_signal, label="MAP estimate", c="C1")
     plt.fill_between(t, med_model - 2*spread, med_model + 2*spread, color="C7", alpha=0.5, label=r"$2\sigma$ posterior spread")
+    plt.plot(t, y, "k", label="Data points", alpha=0.3)
     plt.legend(fontsize=14)
     plt.xlabel("Time")
     plt.ylabel("Normalized count")
@@ -230,10 +231,10 @@ if __name__ == "__main__":
             plt.figure(figsize=(8, 4))
             plt.hist(flat_samples[:, i], 100, color="k", histtype="step")
             plt.axvline(jupiter, c="C1", label="Jupiter")
-            plt.axvline(perc[0], c="C9", label="95% CI")
-            plt.axvline(perc[-1], c="C9")
             plt.axvline(perc[1], c="C7", label="68% CI")
             plt.axvline(perc[-2], c="C7")
+            plt.axvline(perc[0], c="C9", label="95% CI")
+            plt.axvline(perc[-1], c="C9")
             plt.xlabel(fr"$T_{{{i-n+1}}}$")
             plt.ylabel(fr"$p(T_{{{i-n+1}}})$")
             plt.title(fr"Distribution of $T_{{{i-n+1}}}$ samples")
@@ -241,8 +242,9 @@ if __name__ == "__main__":
             plt.legend(fontsize=14)
             plt.tight_layout()
 
+    print("-"*50, "\n")
     print(
-        "\nMean acceptance fraction: {0:.3f}".format(
+        "Mean acceptance fraction: {0:.3f}".format(
             np.mean(sampler.acceptance_fraction)
         )
     )
