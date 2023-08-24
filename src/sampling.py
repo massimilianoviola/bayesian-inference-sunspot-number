@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from multiprocessing import cpu_count, Pool
 import numpy as np
 import pandas as pd
+import scipy
 
 
 plt.rcParams["savefig.dpi"] = 400
@@ -32,12 +33,12 @@ nwalkers, ndim = pos.shape
 
 # Jeffreys prior on sigma, uninformative priors on A and T, zero-mean gaussian prior on phi
 # the gaussian prior corresponds to an L2 penalty, favoring small values
-phi_var = np.pi  # the variance of the gaussian, higher value means less regularization
+phi_std = np.pi  # the standard deviation of the gaussian, higher value means less regularization
 
 def log_prior(theta):
     A, T, phi, sigma = theta[:n], theta[n:2*n], theta[2*n:3*n], theta[-1]
     if sigma > 0 and all(A > 0) and all(T > 0):
-        return -np.log(sigma) - 1/(2 * phi_var**2) * np.sum(phi**2)
+        return -np.log(sigma) - 1/(2 * phi_std**2) * np.sum(phi**2)
     else:
         return -np.inf
 
@@ -59,10 +60,15 @@ if __name__ == "__main__":
     ncpu = cpu_count()  # number of cores
     print(f"Using {ncpu} CPUs for sampling...")
 
+    # set up the backend, clear it in case the file already exists
+    filename = "data/chains.h5"
+    backend = emcee.backends.HDFBackend(filename)
+    backend.reset(nwalkers, ndim)
+
     with Pool() as pool:  # run sampling using multiprocessing
         # initialize the sampler
         sampler = emcee.EnsembleSampler(
-            nwalkers, ndim, log_probability, moves=emcee.moves.DEMove(), pool=pool
+            nwalkers, ndim, log_probability, moves=emcee.moves.DEMove(), pool=pool, backend=backend
         )
         state = sampler.run_mcmc(pos, 50000, progress=True)
 
@@ -150,14 +156,48 @@ if __name__ == "__main__":
     thin = int(0.5 * np.min(tau))  # thin by half the min autocorrelation time
     print(f"Burn-in: {burnin} steps")
     print(f"Thin by: {thin} steps")
+    thinned_samples = sampler.get_chain(discard=burnin, thin=thin)
+    tau_thin = emcee.autocorr.integrated_time(thinned_samples, quiet=True)
+    print(f"Mean autocorrelation time (after burn-in and thin): {np.mean(tau_thin):.3f} steps")
+    del thinned_samples
 
     flat_samples = sampler.get_chain(flat=True, discard=burnin, thin=thin)
     print(f"Flat samples shape (after burn-in and thin): {flat_samples.shape}\n")
 
     flat_logprob = sampler.get_log_prob(flat=True, discard=burnin, thin=thin)
     theta_max = flat_samples[np.argmax(flat_logprob)]  # MAP estimate
-    print(f"Log likelihood improved from {log_likelihood(sol):.3f} to {log_likelihood(theta_max):.3f}\n")
+
+    ##################################################
+
+    # compare fourier initialization vs MAP estimate
+    print("Fourier initialization vs MAP estimate:")
+    print(f"Log prior went from {log_prior(sol):.3f} to {log_prior(theta_max):.3f}")
+    print(f"Log likelihood went from {log_likelihood(sol):.3f} to {log_likelihood(theta_max):.3f}")
+    print(f"Log posterior went from {log_probability(sol):.3f} to {log_probability(theta_max):.3f}\n")
+    # define vectorized np functions
+    prior_v = np.vectorize(log_prior,signature="(n) -> ()")
+    likelihood_v = np.vectorize(log_likelihood, signature="(n) -> ()")
+    posterior_v = np.vectorize(log_probability, signature="(n) -> ()")
+    # compare average walker behavior
+    print("Average walker behavior:")
+    print(f"Average log prior went from {np.mean(prior_v(pos)):.3f} to {np.mean(prior_v(flat_samples)):.3f}")
+    print(f"Average log likelihood went from {np.mean(likelihood_v(pos)):.3f} to {np.mean(likelihood_v(flat_samples)):.3f}")
+    print(f"Average log posterior went from {np.mean(posterior_v(pos)):.3f} to {np.mean(flat_logprob):.3f}\n")
     print("-"*50)
+
+    ##################################################
+
+    plt.figure(figsize=(8, 5))
+    s = np.arange(-4*phi_std, 4*phi_std, 0.01)
+    f = scipy.stats.norm.pdf(s, 0, phi_std)
+    plt.plot(s,f, lw=3, c="k", label="Prior")
+    plt.ylabel("Density")
+    plt.title(r"Sample distribution vs prior for $\phi$")
+    for i in range(n):
+        col = np.random.random(3)  # random color
+        plt.hist(flat_samples[:, 2*n+i], 100, color=col, alpha=0.5, label=f"$\phi_{{{i+1}}}$", density=True)
+    plt.legend(fontsize=8)
+    plt.tight_layout()
 
     ##################################################
 
