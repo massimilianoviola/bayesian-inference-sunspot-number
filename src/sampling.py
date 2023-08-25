@@ -236,7 +236,7 @@ if __name__ == "__main__":
 
     ##################################################
 
-    # plot 2 sigma posterior spread into the observed data space
+    # plot MAP + 2 sigma posterior spread into the observed data space
     models = []
     thetas = flat_samples[inds]
     for theta in thetas:
@@ -257,6 +257,28 @@ if __name__ == "__main__":
     plt.ylabel("Normalized count")
     plt.title(r"$2\sigma$ posterior spread into the observed data space")
     plt.tight_layout()
+    
+    # plot mean + 2 sigma posterior spread into the observed data space
+    models = []
+    for theta in flat_samples:
+        A, T, phi, sigma = theta[:n], theta[n:2*n], theta[2*n:3*n], theta[-1]
+        signal = np.zeros(len(t))
+        for magnitude, period, phase in zip(A, T, phi):
+            signal += magnitude * np.cos(2 * np.pi / period * t + phase)
+        models.append(signal)
+    spread = np.std(models, axis=0)
+    mean_model = np.mean(models, axis=0)
+    
+    plt.figure(figsize=(12, 5))
+    plt.plot(t, mean_model, label="Mean signal", c="C1")
+    plt.fill_between(t, mean_model - 2*spread, mean_model + 2*spread, color="C7", alpha=0.5, label=r"$2\sigma$ posterior spread")
+    plt.plot(t, y, "k", label="Data points", alpha=0.3)
+    plt.legend(fontsize=14)
+    plt.xlabel("Time")
+    plt.ylabel("Normalized count")
+    plt.title(r"$2\sigma$ posterior spread into the observed data space")
+    plt.tight_layout()
+
 
     ##################################################
 
