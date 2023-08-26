@@ -165,15 +165,15 @@ if __name__ == "__main__":
     print(f"Flat samples shape (after burn-in and thin): {flat_samples.shape}\n")
 
     flat_logprob = sampler.get_log_prob(flat=True, discard=burnin, thin=thin)
-    theta_max = flat_samples[np.argmax(flat_logprob)]  # MAP estimate
+    theta_mean = flat_samples.mean(axis=0)  # mean estimate for each parameter
 
     ##################################################
 
-    # compare fourier initialization vs MAP estimate
-    print("Fourier initialization vs MAP estimate:")
-    print(f"Log prior went from {log_prior(sol):.3f} to {log_prior(theta_max):.3f}")
-    print(f"Log likelihood went from {log_likelihood(sol):.3f} to {log_likelihood(theta_max):.3f}")
-    print(f"Log posterior went from {log_probability(sol):.3f} to {log_probability(theta_max):.3f}\n")
+    # compare fourier initialization vs mean estimate
+    print("Fourier initialization vs mean estimate:")
+    print(f"Log prior went from {log_prior(sol):.3f} to {log_prior(theta_mean):.3f}")
+    print(f"Log likelihood went from {log_likelihood(sol):.3f} to {log_likelihood(theta_mean):.3f}")
+    print(f"Log posterior went from {log_probability(sol):.3f} to {log_probability(theta_mean):.3f}\n")
     # define vectorized np functions
     prior_v = np.vectorize(log_prior,signature="(n) -> ()")
     likelihood_v = np.vectorize(log_likelihood, signature="(n) -> ()")
@@ -202,62 +202,46 @@ if __name__ == "__main__":
     ##################################################
 
     # project the sampling results into the observed data space
-    plt.figure(figsize=(12, 5))
-    inds = np.random.randint(len(flat_samples), size=200)
-    for ind in inds:
-        sample = flat_samples[ind]
-        A, T, phi, sigma = sample[:n], sample[n:2*n], sample[2*n:3*n], sample[-1]
-        signal = np.zeros(len(t))
-        for magnitude, period, phase in zip(A, T, phi):
-            signal += magnitude * np.cos(2 * np.pi / period * t + phase)
-        plt.plot(t, signal, "C7", alpha=0.1, label="Samples") if ind == inds[0] else plt.plot(t, signal, "C7", alpha=0.1)
+    # see difference between the initial and final model
+    fig, ax = plt.subplots(figsize=(12, 5))
 
     # add the initial estimate obtained from fourier
     A, T, phi, sigma = sol[:n], sol[n:2*n], sol[2*n:3*n], sol[-1]
     signal = np.zeros(len(t))
     for magnitude, period, phase in zip(A, T, phi):
         signal += magnitude * np.cos(2 * np.pi / period * t + phase)
-    plt.plot(t, signal, "C8", label="Initial estimate")
+    ax.plot(t, signal, "C7", label="Initial estimate")
 
-    # add the estimate with maximum value of posterior (MAP estimate)
-    A, T, phi, sigma = theta_max[:n], theta_max[n:2*n], theta_max[2*n:3*n], theta_max[-1]
-    map_signal = np.zeros(len(t))
+    # add the mean estimate
+    A, T, phi, sigma = theta_mean[:n], theta_mean[n:2*n], theta_mean[2*n:3*n], theta_mean[-1]
+    mean_signal = np.zeros(len(t))
     for magnitude, period, phase in zip(A, T, phi):
-        map_signal += magnitude * np.cos(2 * np.pi / period * t + phase)
-    plt.plot(t, map_signal, "C1", label="MAP estimate")
+        mean_signal += magnitude * np.cos(2 * np.pi / period * t + phase)
+    ax.plot(t, mean_signal, "C1", label="Mean estimate")
 
     # add observed data in the background
-    plt.plot(t, y, "k", label="Data points", alpha=0.3)
-    plt.legend(fontsize=14)
-    plt.xlabel("Time")
-    plt.ylabel("Normalized count")
-    plt.title("Projection of the sampling results into the observed data space")
+    ax.plot(t, y, "k", label="Data points", alpha=0.3)
+    ax.legend(fontsize=14)
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Normalized count")
+    ax.set_title("Projection of the sampling results into the observed data space")
+
+    # zoom in
+    zoom_coords = [0.465, 0.58, 0.1, 0.4]
+    x1, x2, y1, y2 = 1896, 1910, -70, 25
+    axins = ax.inset_axes(zoom_coords)
+    axins.plot(t, signal, "C7")
+    axins.plot(t, mean_signal, "C1")
+    axins.plot(t, y, "k", alpha=0.3)
+    axins.set_xlim(x1, x2)
+    axins.set_ylim(y1, y2)
+    axins.set_xticklabels([])
+    axins.set_yticklabels([])
+    ax.indicate_inset_zoom(axins, edgecolor="k")
     plt.tight_layout()
 
     ##################################################
 
-    # plot MAP + 2 sigma posterior spread into the observed data space
-    models = []
-    thetas = flat_samples[inds]
-    for theta in thetas:
-        A, T, phi, sigma = theta[:n], theta[n:2*n], theta[2*n:3*n], theta[-1]
-        signal = np.zeros(len(t))
-        for magnitude, period, phase in zip(A, T, phi):
-            signal += magnitude * np.cos(2 * np.pi / period * t + phase)
-        models.append(signal)
-    spread = np.std(models, axis=0)
-    med_model = np.median(models, axis=0)
-
-    plt.figure(figsize=(12, 5))
-    plt.plot(t, map_signal, label="MAP estimate", c="C1")
-    plt.fill_between(t, med_model - 2*spread, med_model + 2*spread, color="C7", alpha=0.5, label=r"$2\sigma$ posterior spread")
-    plt.plot(t, y, "k", label="Data points", alpha=0.3)
-    plt.legend(fontsize=14)
-    plt.xlabel("Time")
-    plt.ylabel("Normalized count")
-    plt.title(r"$2\sigma$ posterior spread into the observed data space")
-    plt.tight_layout()
-    
     # plot mean + 2 sigma posterior spread into the observed data space
     models = []
     for theta in flat_samples:
@@ -268,17 +252,26 @@ if __name__ == "__main__":
         models.append(signal)
     spread = np.std(models, axis=0)
     mean_model = np.mean(models, axis=0)
-    
-    plt.figure(figsize=(12, 5))
-    plt.plot(t, mean_model, label="Mean signal", c="C1")
-    plt.fill_between(t, mean_model - 2*spread, mean_model + 2*spread, color="C7", alpha=0.5, label=r"$2\sigma$ posterior spread")
-    plt.plot(t, y, "k", label="Data points", alpha=0.3)
-    plt.legend(fontsize=14)
-    plt.xlabel("Time")
-    plt.ylabel("Normalized count")
-    plt.title(r"$2\sigma$ posterior spread into the observed data space")
-    plt.tight_layout()
 
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.plot(t, mean_signal, label="Mean estimate", c="C1")
+    ax.fill_between(t, mean_model - 2*spread, mean_model + 2*spread, color="C7", alpha=0.5, label=r"$2\sigma$ posterior spread")
+    ax.plot(t, y, "k", label="Data points", alpha=0.3)
+    ax.legend(fontsize=14)
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Normalized count")
+    ax.set_title(r"$2\sigma$ posterior spread into the observed data space")
+
+    axins = ax.inset_axes(zoom_coords)
+    axins.plot(t, mean_signal, "C1")
+    axins.fill_between(t, mean_model - 2*spread, mean_model + 2*spread, color="C7", alpha=0.5)
+    axins.plot(t, y, "k", alpha=0.3)
+    axins.set_xlim(x1, x2)
+    axins.set_ylim(y1, y2)
+    axins.set_xticklabels([])
+    axins.set_yticklabels([])
+    ax.indicate_inset_zoom(axins, edgecolor="k")
+    plt.tight_layout()
 
     ##################################################
 
