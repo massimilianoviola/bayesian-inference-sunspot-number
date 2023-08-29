@@ -68,7 +68,7 @@ if __name__ == "__main__":
     with Pool() as pool:  # run sampling using multiprocessing
         # initialize the sampler
         sampler = emcee.EnsembleSampler(
-            nwalkers, ndim, log_probability, moves=emcee.moves.DEMove(), pool=pool, backend=backend
+            nwalkers, ndim, log_probability, moves=emcee.moves.DEMove(gamma0=0.8*2.38/np.sqrt(2*ndim)), pool=pool, backend=backend
         )
         state = sampler.run_mcmc(pos, 50000, progress=True)
 
